@@ -1,0 +1,2 @@
+import { NextRequest } from 'next/server'; import { requireEditorOrAbove,handleApiError,apiResponse } from '@/pipeline/middleware/auth.middleware'; import ArticleService from '@/pipeline/articles/article.service';
+export async function POST(req:NextRequest,{params}:{params:Promise<{id:string}>}){try{await requireEditorOrAbove(req);const {id}=await params;const body=await req.json() as {reason?:string};await ArticleService.reject(id,body.reason??'Rejected by editor');return apiResponse({message:'Article rejected'})}catch(e){return handleApiError(e)}}

@@ -1,0 +1,2 @@
+import { NextRequest } from 'next/server'; import {authenticate,handleApiError,apiResponse} from '@/pipeline/middleware/auth.middleware'; import {metricsRepository} from '@/pipeline/repositories/metrics.repository';
+export async function GET(req:NextRequest){try{await authenticate(req);const hours=Math.min(168,Math.max(1,Number(new URL(req.url).searchParams.get('hours')??24)));return apiResponse({summary:await metricsRepository.getSummary(),recent:await metricsRepository.getRecent(hours)})}catch(e){return handleApiError(e)}}

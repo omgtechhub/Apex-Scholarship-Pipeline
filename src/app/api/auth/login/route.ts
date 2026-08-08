@@ -1,0 +1,2 @@
+import { NextRequest } from 'next/server'; import {login} from '@/pipeline/auth/auth.service'; import {handleApiError,apiResponse} from '@/pipeline/middleware/auth.middleware';
+export async function POST(req:NextRequest){try{const body=await req.json() as {email?:string;password?:string};if(!body.email||!body.password)throw new Error('email and password are required');return apiResponse(await login(body.email,body.password))}catch(e){return handleApiError(e)}}

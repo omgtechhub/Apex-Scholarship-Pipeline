@@ -1,0 +1,2 @@
+import { NextRequest } from 'next/server'; import { requireEditorOrAbove,handleApiError,apiResponse } from '@/pipeline/middleware/auth.middleware'; import QueueManager from '@/pipeline/queue/queue-manager'; import {QUEUES,JOB_NAMES} from '@/pipeline/queue/queue-names';
+export async function POST(req:NextRequest,{params}:{params:Promise<{id:string}>}){try{await requireEditorOrAbove(req);const {id}=await params;const job=await QueueManager.add(QUEUES.PUBLISHING,JOB_NAMES.PUBLISH_ARTICLE,{articleId:id});return apiResponse({jobId:job.id},202)}catch(e){return handleApiError(e)}}
