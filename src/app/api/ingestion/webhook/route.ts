@@ -1,0 +1,2 @@
+import { NextRequest } from 'next/server'; import {channelService} from '@/pipeline/services/channel.service'; import {handleApiError,apiResponse} from '@/pipeline/middleware/auth.middleware';
+export async function POST(req:NextRequest){try{if(!channelService.validateWebhookSecret(req.headers.get('x-channel-secret')))throw new Error('Unauthorized');const body=await req.json();return apiResponse(await channelService.ingest(body),202)}catch(e){return handleApiError(e)}}

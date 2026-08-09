@@ -1,0 +1,579 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum SourceStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+  PAUSED
+}
+
+enum CrawlStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ScholarshipStatus {
+  ACTIVE
+  EXPIRED
+  DRAFT
+  ARCHIVED
+  REJECTED
+}
+
+enum ArticleStatus {
+  DRAFT
+  GENERATING
+  GENERATED
+  QUALITY_REVIEW
+  APPROVED
+  REJECTED
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+  FAILED
+}
+
+enum DuplicateResult {
+  NEW
+  UPDATED
+  DUPLICATE
+  REJECTED
+}
+
+enum FundingType {
+  FULL
+  PARTIAL
+  TUITION_ONLY
+  LIVING_ALLOWANCE
+  TRAVEL
+  UNKNOWN
+}
+
+enum DegreeLevel {
+  UNDERGRADUATE
+  MASTERS
+  PHD
+  POSTDOCTORAL
+  SHORT_COURSE
+  ONLINE
+  ANY
+  UNKNOWN
+}
+
+enum QualityStatus {
+  PASS
+  REVIEW
+  REJECT
+}
+
+enum NotificationEvent {
+  CRAWL_FAILURE
+  REPEATED_CRAWL_FAILURE
+  SCHOLARSHIP_DISCOVERED
+  ARTICLE_GENERATED
+  QUALITY_FAILURE
+  ARTICLE_APPROVED
+  ARTICLE_PUBLISHED
+  PIPELINE_FAILURE
+}
+
+enum JobStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  FAILED
+  DELAYED
+  PAUSED
+}
+
+enum PublishingStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+  FAILED
+}
+
+// ─── User & Auth ──────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         UserRole  @default(VIEWER)
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  auditLogs AuditLog[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// ─── Organisation ─────────────────────────────────────────────────────────────
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  website     String?
+  country     String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  scholarships Scholarship[]
+
+  @@index([name])
+  @@map("organizations")
+}
+
+// ─── Scholarship Sources ──────────────────────────────────────────────────────
+
+model ScholarshipSource {
+  id               String       @id @default(uuid())
+  name             String       @unique
+  slug             String       @unique
+  url              String
+  adapterKey       String
+  status           SourceStatus @default(ACTIVE)
+  crawlIntervalMin Int          @default(30)
+  lastCrawledAt    DateTime?
+  nextCrawlAt      DateTime?
+  consecutiveFails Int          @default(0)
+  config           Json?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  crawlerJobs  CrawlerJob[]
+  crawlerLogs  CrawlerLog[]
+  scholarships Scholarship[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([nextCrawlAt])
+  @@map("scholarship_sources")
+}
+
+// ─── Scholarships ─────────────────────────────────────────────────────────────
+
+model Scholarship {
+  id                      String            @id @default(uuid())
+  sourceId                String
+  source                  ScholarshipSource @relation(fields: [sourceId], references: [id])
+  organizationId          String?
+  organization            Organization?     @relation(fields: [organizationId], references: [id])
+  title                   String
+  slug                    String            @unique
+  description             String?
+  officialUrl             String
+  applicationUrl          String?
+  deadline                DateTime?
+  startDate               DateTime?
+  country                 String?
+  eligibleCountries       String[]
+  degreeLevel             DegreeLevel       @default(UNKNOWN)
+  fieldsOfStudy           String[]
+  fundingType             FundingType       @default(UNKNOWN)
+  fundingAmount           Float?
+  currency                String?
+  benefits                String[]
+  eligibility             String?
+  requirements            String[]
+  documents               String[]
+  applicationInstructions String?
+  contentHash             String
+  status                  ScholarshipStatus @default(ACTIVE)
+  raw                     Json?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  versions    ScholarshipVersion[]
+  duplicates  DuplicateRecord[]    @relation("originalScholarship")
+  duplicateOf DuplicateRecord[]    @relation("duplicateScholarship")
+  articles    Article[]
+
+  @@index([sourceId])
+  @@index([status])
+  @@index([deadline])
+  @@index([officialUrl])
+  @@index([applicationUrl])
+  @@index([contentHash])
+  @@index([slug])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([country])
+  @@index([degreeLevel])
+  @@index([fundingType])
+  @@map("scholarships")
+}
+
+model ScholarshipVersion {
+  id            String      @id @default(uuid())
+  scholarshipId String
+  scholarship   Scholarship @relation(fields: [scholarshipId], references: [id], onDelete: Cascade)
+  version       Int
+  changedFields String[]
+  before        Json
+  after         Json
+  createdAt     DateTime    @default(now())
+
+  @@index([scholarshipId])
+  @@index([version])
+  @@map("scholarship_versions")
+}
+
+model DuplicateRecord {
+  id            String          @id @default(uuid())
+  originalId    String
+  original      Scholarship     @relation("originalScholarship", fields: [originalId], references: [id])
+  duplicateId   String
+  duplicate     Scholarship     @relation("duplicateScholarship", fields: [duplicateId], references: [id])
+  result        DuplicateResult
+  similarity    Float?
+  matchedFields String[]
+  createdAt     DateTime        @default(now())
+
+  @@index([originalId])
+  @@index([duplicateId])
+  @@map("duplicate_records")
+}
+
+// ─── Articles ─────────────────────────────────────────────────────────────────
+
+model Article {
+  id              String         @id @default(uuid())
+  scholarshipId   String
+  scholarship     Scholarship    @relation(fields: [scholarshipId], references: [id])
+  promptVersionId String?
+  promptVersion   PromptVersion? @relation(fields: [promptVersionId], references: [id])
+  title           String
+  slug            String         @unique
+  content         String
+  status          ArticleStatus  @default(DRAFT)
+  wordCount       Int?
+  readingTime     Int?
+  publishedAt     DateTime?
+  scheduledAt     DateTime?
+  rejectionReason String?
+  metadata        Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  versions      ArticleVersion[]
+  seo           ArticleSEO?
+  qualityChecks QualityCheck[]
+  publications  Publication[]
+
+  @@index([scholarshipId])
+  @@index([status])
+  @@index([slug])
+  @@index([publishedAt])
+  @@index([scheduledAt])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@map("articles")
+}
+
+model ArticleVersion {
+  id        String        @id @default(uuid())
+  articleId String
+  article   Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  version   Int
+  title     String
+  content   String
+  status    ArticleStatus
+  metadata  Json?
+  createdAt DateTime      @default(now())
+
+  @@index([articleId])
+  @@index([version])
+  @@map("article_versions")
+}
+
+model ArticleSEO {
+  id                 String   @id @default(uuid())
+  articleId          String   @unique
+  article            Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  seoTitle           String
+  metaDescription    String
+  slug               String
+  keywords           String[]
+  canonicalUrl       String?
+  ogTitle            String?
+  ogDescription      String?
+  ogImage            String?
+  twitterTitle       String?
+  twitterDescription String?
+  jsonLd             Json?
+  faqSchema          Json?
+  breadcrumbSchema   Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([articleId])
+  @@index([slug])
+  @@map("article_seo")
+}
+
+model QualityCheck {
+  id               String        @id @default(uuid())
+  articleId        String
+  article          Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  score            Float
+  status           QualityStatus
+  checks           Json
+  errors           String[]
+  warnings         String[]
+  recommendations  String[]
+  factualMismatches Json?
+  createdAt        DateTime      @default(now())
+
+  @@index([articleId])
+  @@index([status])
+  @@map("quality_checks")
+}
+
+model Publication {
+  id          String           @id @default(uuid())
+  articleId   String
+  article     Article          @relation(fields: [articleId], references: [id])
+  provider    String
+  externalId  String?
+  externalUrl String?
+  status      PublishingStatus
+  publishedAt DateTime?
+  scheduledAt DateTime?
+  metadata    Json?
+  error       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([articleId])
+  @@index([status])
+  @@index([provider])
+  @@map("publications")
+}
+
+// ─── Crawler Jobs ─────────────────────────────────────────────────────────────
+
+model CrawlerJob {
+  id          String            @id @default(uuid())
+  sourceId    String
+  source      ScholarshipSource @relation(fields: [sourceId], references: [id])
+  status      CrawlStatus       @default(PENDING)
+  startedAt   DateTime?
+  completedAt DateTime?
+  scholarships Int              @default(0)
+  errors      String[]
+  metadata    Json?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  logs CrawlerLog[]
+
+  @@index([sourceId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("crawler_jobs")
+}
+
+model CrawlerLog {
+  id        String            @id @default(uuid())
+  jobId     String?
+  job       CrawlerJob?       @relation(fields: [jobId], references: [id])
+  sourceId  String
+  source    ScholarshipSource @relation(fields: [sourceId], references: [id])
+  level     String
+  message   String
+  metadata  Json?
+  createdAt DateTime          @default(now())
+
+  @@index([jobId])
+  @@index([sourceId])
+  @@index([level])
+  @@index([createdAt])
+  @@map("crawler_logs")
+}
+
+model ExecutionLog {
+  id        String   @id @default(uuid())
+  type      String
+  status    String
+  message   String?
+  metadata  Json?
+  duration  Int?
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@map("execution_logs")
+}
+
+model QueueHistory {
+  id          String    @id @default(uuid())
+  queue       String
+  jobId       String
+  jobName     String
+  status      JobStatus
+  input       Json?
+  output      Json?
+  error       String?
+  attempts    Int       @default(0)
+  duration    Int?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([queue])
+  @@index([jobId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("queue_history")
+}
+
+// ─── Prompts ──────────────────────────────────────────────────────────────────
+
+model Prompt {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  versions PromptVersion[]
+
+  @@index([name])
+  @@map("prompts")
+}
+
+model PromptVersion {
+  id        String   @id @default(uuid())
+  promptId  String
+  prompt    Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  version   Int
+  content   String
+  variables String[]
+  active    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  articles Article[]
+
+  @@index([promptId])
+  @@index([version])
+  @@index([active])
+  @@map("prompt_versions")
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String            @id @default(uuid())
+  event     NotificationEvent
+  channel   String
+  payload   Json
+  status    String            @default("pending")
+  sentAt    DateTime?
+  error     String?
+  createdAt DateTime          @default(now())
+
+  @@index([event])
+  @@index([status])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ─── Metrics ─────────────────────────────────────────────────────────────────
+
+model Metric {
+  id         String   @id @default(uuid())
+  name       String
+  value      Float
+  labels     Json?
+  recordedAt DateTime @default(now())
+
+  @@index([name])
+  @@index([recordedAt])
+  @@map("metrics")
+}
+
+// ─── Audit Logging ────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  metadata  Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─── System Settings ─────────────────────────────────────────────────────────
+
+model SystemSettings {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+  @@map("system_settings")
+}
+
+// ─── Channel Ingestion ────────────────────────────────────────────────────────
+
+model ChannelMessage {
+  id            String    @id @default(uuid())
+  provider      String
+  channelId     String?
+  senderId      String?
+  content       String
+  extractedUrls String[]
+  processed     Boolean   @default(false)
+  scholarshipId String?
+  metadata      Json?
+  receivedAt    DateTime  @default(now())
+  processedAt   DateTime?
+
+  @@index([provider])
+  @@index([processed])
+  @@index([receivedAt])
+  @@map("channel_messages")
+}

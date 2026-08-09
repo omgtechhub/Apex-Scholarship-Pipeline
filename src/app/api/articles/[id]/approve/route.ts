@@ -1,0 +1,2 @@
+import { NextRequest } from 'next/server'; import { requireEditorOrAbove,handleApiError,apiResponse } from '@/pipeline/middleware/auth.middleware'; import ArticleService from '@/pipeline/articles/article.service';
+export async function POST(req:NextRequest,{params}:{params:Promise<{id:string}>}){try{await requireEditorOrAbove(req);const {id}=await params;await ArticleService.approve(id);return apiResponse({message:'Article approved'})}catch(e){return handleApiError(e)}}

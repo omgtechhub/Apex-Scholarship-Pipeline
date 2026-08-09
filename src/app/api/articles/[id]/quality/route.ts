@@ -1,0 +1,2 @@
+import { NextRequest } from 'next/server'; import prisma from '@/pipeline/database/prisma-client'; import {authenticate,handleApiError,apiResponse} from '@/pipeline/middleware/auth.middleware';
+export async function GET(req:NextRequest,{params}:{params:Promise<{id:string}>}){try{await authenticate(req);const {id}=await params;return apiResponse(await prisma.qualityCheck.findMany({where:{articleId:id},orderBy:{createdAt:'desc'}}))}catch(e){return handleApiError(e)}}
