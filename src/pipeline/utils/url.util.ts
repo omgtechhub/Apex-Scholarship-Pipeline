@@ -63,6 +63,17 @@ export function assertSafeUrl(url: string): void {
   }
 }
 
+export function isSafeUrl(url: string): boolean {
+
+  try {
+    assertSafeUrl(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+
 /**
  * Get the canonical form of a URL (remove tracking params, etc.)
  */

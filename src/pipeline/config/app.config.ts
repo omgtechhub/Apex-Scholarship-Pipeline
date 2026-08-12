@@ -118,7 +118,8 @@ export function getAppConfig(): AppConfig {
 
   const e = getEnv();
 
-  _config = {
+  const config: AppConfig = {
+
     env: e.PIPELINE_ENV,
     port: e.PIPELINE_PORT,
     logLevel: e.PIPELINE_LOG_LEVEL,
@@ -204,7 +205,7 @@ export function getAppConfig(): AppConfig {
 
     security: {
       bcryptRounds: 12,
-      apiKey: e.PIPELINE_API_KEY,
+      apiKey: e.PIPELINE_API_KEY ?? '',
       maxLoginAttempts: 5,
       lockoutDurationMs: 15 * 60 * 1000, // 15 minutes
       passwordMinLength: 8,
@@ -214,8 +215,10 @@ export function getAppConfig(): AppConfig {
     },
   };
 
-  return _config;
+  _config = config;
+  return config;
 }
+
 
 // Export singleton
 export const appConfig = new Proxy({} as AppConfig, {

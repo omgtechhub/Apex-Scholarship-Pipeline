@@ -14,7 +14,7 @@ export function getRedisClient(): Redis {
     maxRetriesPerRequest: null, // Required for BullMQ
     enableReadyCheck: false,
     lazyConnect: false,
-    retryStrategy: (times) => {
+    retryStrategy: (times: number) => {
       if (times > 10) {
         logger.error({ times }, 'Redis max retries exceeded');
         return null;
@@ -40,7 +40,10 @@ export function createRedisConnection(): Redis {
 
 export async function closeRedis(): Promise<void> {
   if (redisClient) {
-    await redisClient.quit();
+    if (typeof (redisClient as any).quit === 'function') {
+      await (redisClient as any).quit();
+    }
     redisClient = null;
   }
 }
+

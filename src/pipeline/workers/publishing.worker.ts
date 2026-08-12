@@ -7,6 +7,8 @@ import PublishingService from '../publishing/publishing-service';
 import prisma from '../database/prisma-client';
 import { JobStatus } from '../../../generated/prisma';
 
+
+
 const logger = createLogger('publishing-worker');
 
 export function createPublishingWorker() {

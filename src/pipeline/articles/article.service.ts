@@ -5,21 +5,25 @@ import { toSlug, makeUniqueSlug } from '../utils/string.util';
 import { NotFoundError } from '../errors/base.error';
 import { ArticleStatus } from '../../../generated/prisma';
 
+
+
 const logger = createLogger('article-service');
 
 // Valid state machine transitions
 const VALID_TRANSITIONS: Record<ArticleStatus, ArticleStatus[]> = {
   [ArticleStatus.DRAFT]: [ArticleStatus.GENERATING, ArticleStatus.FAILED],
   [ArticleStatus.GENERATING]: [ArticleStatus.GENERATED, ArticleStatus.FAILED],
-  [ArticleStatus.GENERATED]: [ArticleStatus.QUALITY_REVIEW, ArticleStatus.FAILED],
-  [ArticleStatus.QUALITY_REVIEW]: [ArticleStatus.APPROVED, ArticleStatus.REJECTED],
-  [ArticleStatus.APPROVED]: [ArticleStatus.SCHEDULED, ArticleStatus.PUBLISHED, ArticleStatus.ARCHIVED],
+  [ArticleStatus.GENERATED]: [ArticleStatus.GENERATING, ArticleStatus.QUALITY_REVIEW, ArticleStatus.FAILED],
+  [ArticleStatus.QUALITY_REVIEW]: [ArticleStatus.GENERATING, ArticleStatus.APPROVED, ArticleStatus.REJECTED],
+  [ArticleStatus.APPROVED]: [ArticleStatus.GENERATING, ArticleStatus.SCHEDULED, ArticleStatus.PUBLISHED, ArticleStatus.ARCHIVED],
   [ArticleStatus.REJECTED]: [ArticleStatus.GENERATING, ArticleStatus.ARCHIVED],
   [ArticleStatus.SCHEDULED]: [ArticleStatus.PUBLISHED, ArticleStatus.APPROVED],
-  [ArticleStatus.PUBLISHED]: [ArticleStatus.ARCHIVED],
+  [ArticleStatus.PUBLISHED]: [ArticleStatus.GENERATING, ArticleStatus.ARCHIVED],
+
   [ArticleStatus.ARCHIVED]: [],
   [ArticleStatus.FAILED]: [ArticleStatus.GENERATING],
 };
+
 
 export const ArticleService = {
   /**

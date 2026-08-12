@@ -53,42 +53,103 @@ function formatScholarshipData(data: ScholarshipDataForAI): string {
   }, null, 2);
 }
 
-function parseArticleContent(raw: string): ArticleContent {
-  // Try to extract JSON from the response
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error('No JSON object found in AI response');
+function extractFieldsByRegex(text: string): Record<string, any> {
+  const result: Record<string, any> = {};
+  const fields = [
+    'title', 'introduction', 'overview', 'provider', 'studyLevel',
+    'eligibleCountries', 'eligibleFields', 'funding', 'eligibility',
+    'requirements', 'documents', 'applicationProcess', 'deadline',
+    'officialLink', 'callToAction'
+  ];
+
+  for (const field of fields) {
+    const regex = new RegExp(`"${field}"\\s*:\\s*"([\\s\\S]*?)"(?=\\s*,\\s*"|\\s*\\})`, 'i');
+    const match = text.match(regex);
+    if (match) {
+      result[field] = match[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+    }
   }
 
-  const parsed = JSON.parse(jsonMatch[0]);
+  return result;
+}
 
-  // Validate required fields
-  if (!parsed.title || !parsed.introduction) {
-    throw new Error('AI response missing required fields (title, introduction)');
+function parseArticleContent(raw: string): ArticleContent {
+  let cleaned = raw.trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  const startIdx = cleaned.indexOf('{');
+  const endIdx = cleaned.lastIndexOf('}');
+
+  let parsed: any;
+  if (startIdx !== -1 && endIdx > startIdx) {
+    const jsonStr = cleaned.substring(startIdx, endIdx + 1);
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      // String-aware control character escaping
+      try {
+        let inString = false;
+        let escaped = false;
+        let result = '';
+
+        for (let i = 0; i < jsonStr.length; i++) {
+          const char = jsonStr[i];
+
+          if (char === '"' && !escaped) {
+            inString = !inString;
+            result += char;
+          } else if (inString && char === '\n' && !escaped) {
+            result += '\\n';
+          } else if (inString && char === '\r' && !escaped) {
+            result += '\\r';
+          } else if (inString && char === '\t' && !escaped) {
+            result += '\\t';
+          } else {
+            result += char;
+          }
+
+          if (char === '\\' && !escaped) {
+            escaped = true;
+          } else {
+            escaped = false;
+          }
+        }
+        parsed = JSON.parse(result);
+      } catch {
+        // Fallback: extract fields via regex if JSON syntax remains broken
+        parsed = extractFieldsByRegex(jsonStr);
+      }
+    }
+  } else {
+    parsed = extractFieldsByRegex(cleaned);
+  }
+
+  if (!parsed || (!parsed.title && !parsed.introduction)) {
+    parsed = extractFieldsByRegex(raw);
   }
 
   const article: ArticleContent = {
-    title: String(parsed.title ?? ''),
-    introduction: String(parsed.introduction ?? ''),
-    overview: String(parsed.overview ?? ''),
-    provider: String(parsed.provider ?? ''),
-    studyLevel: String(parsed.studyLevel ?? ''),
-    eligibleCountries: String(parsed.eligibleCountries ?? ''),
-    eligibleFields: String(parsed.eligibleFields ?? ''),
-    funding: String(parsed.funding ?? ''),
-    eligibility: String(parsed.eligibility ?? ''),
-    requirements: String(parsed.requirements ?? ''),
-    documents: String(parsed.documents ?? ''),
-    applicationProcess: String(parsed.applicationProcess ?? ''),
-    deadline: String(parsed.deadline ?? ''),
-    officialLink: String(parsed.officialLink ?? ''),
-    faqs: Array.isArray(parsed.faqs)
-      ? parsed.faqs.map((f: { question?: string; answer?: string }) => ({
+    title: String(parsed?.title ?? 'Scholarship Guide'),
+    introduction: String(parsed?.introduction ?? 'Comprehensive scholarship overview.'),
+    overview: String(parsed?.overview ?? ''),
+    provider: String(parsed?.provider ?? ''),
+    studyLevel: String(parsed?.studyLevel ?? ''),
+    eligibleCountries: String(parsed?.eligibleCountries ?? ''),
+    eligibleFields: String(parsed?.eligibleFields ?? ''),
+    funding: String(parsed?.funding ?? ''),
+    eligibility: String(parsed?.eligibility ?? ''),
+    requirements: String(parsed?.requirements ?? ''),
+    documents: String(parsed?.documents ?? ''),
+    applicationProcess: String(parsed?.applicationProcess ?? ''),
+    deadline: String(parsed?.deadline ?? ''),
+    officialLink: String(parsed?.officialLink ?? ''),
+    faqs: Array.isArray(parsed?.faqs)
+      ? parsed.faqs.map((f: any) => ({
           question: String(f.question ?? ''),
           answer: String(f.answer ?? ''),
         }))
       : [],
-    callToAction: String(parsed.callToAction ?? ''),
+    callToAction: String(parsed?.callToAction ?? ''),
     fullContent: '',
   };
 
@@ -99,6 +160,7 @@ function parseArticleContent(raw: string): ArticleContent {
 }
 
 function composeFullContent(article: ArticleContent): string {
+
   const sections: string[] = [];
 
   sections.push(`# ${article.title}\n`);

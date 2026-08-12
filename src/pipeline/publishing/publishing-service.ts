@@ -6,6 +6,8 @@ import type { PublishingProvider } from './publishing-provider.interface';
 import httpPublishingProvider from './http-publishing.provider';
 import { ArticleStatus, PublishingStatus } from '../../../generated/prisma';
 
+
+
 const logger = createLogger('publishing-service');
 
 export class PublishingService {
@@ -30,9 +32,10 @@ export class PublishingService {
 
     if (!article) throw new NotFoundError('Article', articleId);
 
-    if (!['APPROVED', 'SCHEDULED'].includes(article.status)) {
+    if (!['APPROVED', 'SCHEDULED', 'QC_APPROVED', 'GENERATED'].includes(article.status)) {
       throw new Error(`Cannot publish article in status: ${article.status}`);
     }
+
 
     const provider = this.getProvider();
 

@@ -4,6 +4,8 @@ import { createLogger } from '../logger/logger';
 import type { CrawlResult } from '../types';
 import { CrawlStatus } from '../../../generated/prisma';
 
+
+
 const logger = createLogger('crawler-manager');
 
 export const CrawlerManager = {

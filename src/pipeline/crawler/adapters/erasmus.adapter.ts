@@ -95,14 +95,10 @@ export class ErasmusAdapter extends BaseCrawler {
       }
     }
 
-    // If no scholarships extracted, add well-known Erasmus+ programs
-    if (scholarships.length === 0) {
-      scholarships.push(...this.getKnownPrograms());
-    }
-
     this.logger.info({ count: scholarships.length }, 'Erasmus adapter extracted');
     return scholarships;
   }
+
 
   private detectDegree(text: string): string {
     const lower = text.toLowerCase();

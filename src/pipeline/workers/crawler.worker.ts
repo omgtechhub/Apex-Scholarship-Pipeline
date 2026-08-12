@@ -8,6 +8,8 @@ import { createLogger } from '../logger/logger';
 import prisma from '../database/prisma-client';
 import { JobStatus } from '../../../generated/prisma';
 
+
+
 const logger = createLogger('crawler-worker');
 
 export function createCrawlerWorker() {

@@ -1,0 +1,31 @@
+# Scholarship Automation Pipeline - Antigravity Rules
+
+ENVIRONMENT: Windows.
+
+IMPORTANT TERMINAL EXECUTION RULE:
+
+Always execute shell commands through `cmd /c`.
+
+Example:
+cmd /c npm run typecheck
+
+Never execute commands through a persistent PowerShell/bash shell when a self-terminating command is sufficient.
+
+Avoid interactive shells.
+
+Do not use `cmd /k` for commands that should terminate.
+
+For commands that may take a long time:
+- run them as a foreground/self-terminating command whenever possible;
+- do not unnecessarily create background tasks;
+- do not repeatedly poll a background task if its command has already produced its final output;
+- always wait for the actual process exit code.
+
+For Node.js tests and scripts:
+- ensure child processes terminate;
+- ensure Redis/BullMQ/Playwright/Prisma resources are closed;
+- do not leave development servers running unless explicitly required.
+
+Do not repeatedly rerun a command because Antigravity has not received its completion signal. First inspect the existing task output/status.
+
+The user is working on Windows and background terminal EOF/completion detection must be treated as a potential Antigravity executor issue.

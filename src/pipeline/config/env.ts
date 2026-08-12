@@ -108,7 +108,18 @@ function validateEnv() {
       throw new Error(`Environment validation failed:\n${messages}`);
     }
   }
-  return result.data ?? (process.env as unknown as z.infer<typeof envSchema>);
+
+  const parsed = result.data ?? (process.env as unknown as z.infer<typeof envSchema>);
+
+  // Production security guard: reject default placeholder PIPELINE_JWT_SECRET in production
+  if (
+    (process.env.NODE_ENV === 'production' || parsed.PIPELINE_ENV === 'production') &&
+    (parsed.PIPELINE_JWT_SECRET?.includes('change-me') || parsed.JWT_SECRET?.includes('change-me'))
+  ) {
+    throw new Error('FATAL PRODUCTION SECURITY ERROR: PIPELINE_JWT_SECRET must be updated from default placeholder in production!');
+  }
+
+  return parsed;
 }
 
 export function getEnv() { return validateEnv(); }

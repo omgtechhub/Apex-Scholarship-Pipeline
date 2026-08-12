@@ -5,6 +5,8 @@ import QueueManager from '../queue/queue-manager';
 import { createLogger } from '../logger/logger';
 import prisma from '../database/prisma-client';
 import { JobStatus, ArticleStatus } from '../../../generated/prisma';
+
+
 import { qualityService } from '../quality/quality-service';
 
 const logger = createLogger('quality-worker');

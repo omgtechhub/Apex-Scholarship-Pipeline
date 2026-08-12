@@ -17,18 +17,20 @@ export class GroqProvider implements AIProvider {
   }
 
   isAvailable(): boolean {
-    return Boolean(this.apiKey);
+    return Boolean(process.env.GROQ_API_KEY ?? this.apiKey);
   }
 
   private getClient(): Groq {
+    const apiKey = process.env.GROQ_API_KEY ?? this.apiKey;
     if (!this.client) {
-      if (!this.apiKey) {
+      if (!apiKey) {
         throw new AIError('GROQ_API_KEY is not configured', {}, false);
       }
-      this.client = new Groq({ apiKey: this.apiKey });
+      this.client = new Groq({ apiKey });
     }
     return this.client;
   }
+
 
   async complete(
     messages: AIMessage[],

@@ -5,6 +5,8 @@ import { processScholarship } from '../processing/processing-service';
 import { createLogger } from '../logger/logger';
 import prisma from '../database/prisma-client';
 import { JobStatus } from '../../../generated/prisma';
+
+
 import type { ExtractedScholarship } from '../types';
 
 const logger = createLogger('processing-worker');

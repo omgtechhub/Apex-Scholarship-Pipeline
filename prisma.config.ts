@@ -5,8 +5,10 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
+    seed: 'tsx prisma/seed.ts',
   },
   datasource: {
-    url: process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:5432/app_db',
+    url: process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:5432/scholarship_pipeline?schema=public',
   },
 });
+

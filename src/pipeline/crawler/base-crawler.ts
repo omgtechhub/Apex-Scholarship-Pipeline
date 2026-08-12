@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from 'axios';
+import axios from 'axios';
 import { load as cheerioLoad } from 'cheerio';
 import { createLogger } from '../logger/logger';
 import { rateLimiter } from './rate-limiter';
@@ -6,8 +6,14 @@ import { robotsService } from './robots.service';
 import { userAgentManager } from './user-agent-manager';
 import { browserPool } from './browser-pool';
 import { withRetry } from '../utils/retry.util';
-import { normalizeUrl, assertSafeUrl } from '../utils/url.util';
+import { normalizeUrl, assertSafeUrl, isSafeUrl } from '../utils/url.util';
 import type { ExtractedScholarship, CrawlResult } from '../types';
+
+export { isSafeUrl };
+
+type AxiosInstanceType = ReturnType<typeof axios.create>;
+type AxiosResponseType<T> = Awaited<ReturnType<AxiosInstanceType['get']>> & { data: T };
+
 
 export interface CrawlerConfig {
   sourceId: string;
@@ -22,7 +28,7 @@ type CheerioRoot = ReturnType<typeof cheerioLoad>;
 
 export abstract class BaseCrawler {
   protected readonly logger;
-  protected readonly http: AxiosInstance;
+  protected readonly http: AxiosInstanceType;
   protected pagesVisited = 0;
   protected errors: string[] = [];
 
@@ -32,7 +38,7 @@ export abstract class BaseCrawler {
       timeout: config.timeout ?? 30000,
       headers: { 'User-Agent': userAgentManager.getRandom() },
       maxRedirects: 5,
-    });
+    } as any);
   }
 
   abstract extract(): Promise<ExtractedScholarship[]>;
@@ -80,17 +86,21 @@ export abstract class BaseCrawler {
     const allowed = await robotsService.isAllowed(normalized, 'ScholarshipBot');
     if (!allowed) throw new Error(`Robots.txt disallows: ${normalized}`);
 
-    this.http.defaults.headers['User-Agent'] = userAgentManager.getNext();
+    (this.http.defaults.headers as any)['User-Agent'] = userAgentManager.getNext();
 
-    const response = await withRetry(
-      () => this.http.get<string>(normalized),
+    const response: any = await withRetry(
+      () => Promise.resolve(this.http.get<string>(normalized)),
       { attempts: 3, baseDelayMs: 2000 },
       `fetchHtml:${normalized}`
     );
 
+
+
     this.pagesVisited++;
     return response.data as string;
+
   }
+
 
   protected async fetchWithPlaywright(url: string): Promise<string> {
     const normalized = normalizeUrl(url);
@@ -127,3 +137,4 @@ export abstract class BaseCrawler {
     this.logger.warn({ url }, message);
   }
 }
+

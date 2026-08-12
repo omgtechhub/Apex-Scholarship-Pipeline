@@ -6,6 +6,8 @@ import { createLogger } from '../logger/logger';
 import prisma from '../database/prisma-client';
 import { JobStatus, ScholarshipStatus } from '../../../generated/prisma';
 
+
+
 const logger = createLogger('validation-worker');
 
 export function createValidationWorker() {

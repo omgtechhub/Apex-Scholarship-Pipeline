@@ -1,5 +1,8 @@
 // Core pipeline types
 
+export type UUID = string;
+export type QueueName = string;
+
 export interface ExtractedScholarship {
   title: string;
   organization?: string;
@@ -22,6 +25,9 @@ export interface ExtractedScholarship {
   applicationInstructions?: string;
   raw?: Record<string, unknown>;
 }
+
+export type RawScholarshipData = ExtractedScholarship;
+export type PageExtractionResult = ExtractedScholarship;
 
 export interface NormalizedScholarship {
   title: string;
@@ -49,6 +55,8 @@ export interface NormalizedScholarship {
   raw?: Record<string, unknown>;
 }
 
+export type NormalizedScholarshipData = NormalizedScholarship;
+
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
@@ -63,12 +71,23 @@ export interface DeduplicationResult {
   changedFields?: string[];
 }
 
+export type DuplicateCheckResult = DeduplicationResult;
+
 export interface CrawlResult {
   sourceId: string;
   scholarships: ExtractedScholarship[];
   pagesVisited: number;
   errors: string[];
   duration: number;
+}
+
+export type CrawlerResult = CrawlResult;
+
+export interface CrawlerOptions {
+  timeout?: number;
+  retries?: number;
+  useBrowser?: boolean;
+  [key: string]: unknown;
 }
 
 export interface ArticleContent {
@@ -151,6 +170,8 @@ export interface PaginationOptions {
   limit: number;
 }
 
+export type PaginationParams = PaginationOptions;
+
 export interface PaginatedResult<T> {
   data: T[];
   total: number;
@@ -172,3 +193,4 @@ export interface ValidationIssue {
   message: string;
   severity: 'error' | 'warning';
 }
+

@@ -17,8 +17,9 @@ export class CheveningAdapter extends BaseCrawler {
     const scholarships: ExtractedScholarship[] = [];
 
     try {
-      const html = await this.fetchHtml(`${BASE_URL}/scholarships/`);
+      const html = await this.fetchWithPlaywright(`${BASE_URL}/scholarships/`);
       const $ = this.load(html);
+
 
       // Main Chevening scholarship
       const mainTitle =
