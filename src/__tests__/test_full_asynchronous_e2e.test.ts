@@ -13,7 +13,7 @@ import { createAIWorker } from '../pipeline/workers/ai.worker';
 import { createSEOWorker } from '../pipeline/workers/seo.worker';
 import { createQualityWorker } from '../pipeline/workers/quality.worker';
 import { createPublishingWorker } from '../pipeline/workers/publishing.worker';
-import { ArticleStatus, ScholarshipStatus } from '../../generated/prisma';
+import { ArticleStatus, ScholarshipStatus } from '@prisma/client';
 
 async function testFullAsynchronousE2E() {
   const startTime = Date.now();

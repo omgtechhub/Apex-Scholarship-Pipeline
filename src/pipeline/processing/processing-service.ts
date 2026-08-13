@@ -7,7 +7,7 @@ import { QUEUES, JOB_NAMES } from '../queue/queue-names';
 import { createLogger } from '../logger/logger';
 import { toSlug, makeUniqueSlug } from '../utils/string.util';
 import type { ExtractedScholarship } from '../types';
-import { DegreeLevel, FundingType, ScholarshipStatus } from '../../../generated/prisma';
+import { DegreeLevel, FundingType, ScholarshipStatus } from '@prisma/client';
 
 
 

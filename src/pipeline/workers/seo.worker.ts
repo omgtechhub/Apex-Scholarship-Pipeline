@@ -5,7 +5,7 @@ import QueueManager from '../queue/queue-manager';
 import { seoGenerator } from '../seo/seo-generator';
 import { createLogger } from '../logger/logger';
 import prisma from '../database/prisma-client';
-import { JobStatus } from '../../../generated/prisma';
+import { JobStatus } from '@prisma/client';
 
 
 

@@ -4,7 +4,7 @@ import { QUEUES } from '../queue/queue-names';
 import { processScholarship } from '../processing/processing-service';
 import { createLogger } from '../logger/logger';
 import prisma from '../database/prisma-client';
-import { JobStatus } from '../../../generated/prisma';
+import { JobStatus } from '@prisma/client';
 
 
 import type { ExtractedScholarship } from '../types';

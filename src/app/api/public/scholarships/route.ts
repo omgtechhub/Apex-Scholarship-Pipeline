@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/pipeline/database/prisma-client';
 import { apiResponse, handleApiError } from '@/pipeline/middleware/auth.middleware';
-import { ScholarshipStatus, ArticleStatus } from '../../../../../generated/prisma';
+import { ScholarshipStatus, ArticleStatus } from '@prisma/client';
 
 
 

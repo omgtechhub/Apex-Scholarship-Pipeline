@@ -11,7 +11,7 @@ import publishingService from '../pipeline/publishing/publishing-service';
 import { QueueManager } from '../pipeline/queue/queue-manager';
 import { closeRedis } from '../pipeline/queue/redis-client';
 import { browserPool } from '../pipeline/crawler/browser-pool';
-import { ArticleStatus, ScholarshipStatus } from '../../generated/prisma';
+import { ArticleStatus, ScholarshipStatus } from '@prisma/client';
 
 async function runRealLiveE2ETest() {
   const startTime = Date.now();

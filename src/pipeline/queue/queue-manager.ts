@@ -3,7 +3,7 @@ import { createRedisConnection } from './redis-client';
 import { QUEUES, QueueName, JobName } from './queue-names';
 import { createLogger } from '../logger/logger';
 import prisma from '../database/prisma-client';
-import { JobStatus } from '../../../generated/prisma';
+import { JobStatus } from '@prisma/client';
 
 
 

@@ -2,7 +2,7 @@ import prisma from '../database/prisma-client';
 import { scholarshipSimilarity } from '../utils/similarity.util';
 import { createLogger } from '../logger/logger';
 import type { NormalizedScholarship, DeduplicationResult } from '../types';
-import { ScholarshipStatus } from '../../../generated/prisma';
+import { ScholarshipStatus } from '@prisma/client';
 
 
 

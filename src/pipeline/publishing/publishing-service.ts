@@ -4,7 +4,7 @@ import { NotFoundError } from '../errors/base.error';
 import ArticleService from '../articles/article.service';
 import type { PublishingProvider } from './publishing-provider.interface';
 import httpPublishingProvider from './http-publishing.provider';
-import { ArticleStatus, PublishingStatus } from '../../../generated/prisma';
+import { ArticleStatus, PublishingStatus } from '@prisma/client';
 
 
 

@@ -5,7 +5,7 @@ import { createLogger } from '../logger/logger';
 import QueueManager from '../queue/queue-manager';
 import PublishingService from '../publishing/publishing-service';
 import prisma from '../database/prisma-client';
-import { JobStatus } from '../../../generated/prisma';
+import { JobStatus } from '@prisma/client';
 
 
 

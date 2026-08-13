@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/pipeline/database/prisma-client';
 import { apiResponse, handleApiError } from '@/pipeline/middleware/auth.middleware';
-import { ArticleStatus } from '../../../../../../generated/prisma';
+import { ArticleStatus } from '@prisma/client';
 
 
 export const dynamic = 'force-dynamic';

@@ -6,7 +6,7 @@ import QueueManager from '../queue/queue-manager';
 import { JOB_NAMES } from '../queue/queue-names';
 import { createLogger } from '../logger/logger';
 import prisma from '../database/prisma-client';
-import { JobStatus } from '../../../generated/prisma';
+import { JobStatus } from '@prisma/client';
 
 
 

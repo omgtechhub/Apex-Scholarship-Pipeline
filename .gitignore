@@ -1,8 +1,10 @@
 node_modules
 # Keep environment variables out of version control
 .env
+Details.txt
 
-/generated/prisma
+generated/
+src/generated/
 .next/
 dist/
 scratch/

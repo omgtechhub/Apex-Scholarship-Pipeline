@@ -4,7 +4,7 @@ import { QUEUES, JOB_NAMES } from '../queue/queue-names';
 import QueueManager from '../queue/queue-manager';
 import { createLogger } from '../logger/logger';
 import prisma from '../database/prisma-client';
-import { JobStatus, ScholarshipStatus } from '../../../generated/prisma';
+import { JobStatus, ScholarshipStatus } from '@prisma/client';
 
 
 

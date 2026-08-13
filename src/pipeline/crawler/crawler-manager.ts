@@ -2,7 +2,7 @@ import { CrawlerRegistry } from './crawler-registry';
 import prisma from '../database/prisma-client';
 import { createLogger } from '../logger/logger';
 import type { CrawlResult } from '../types';
-import { CrawlStatus } from '../../../generated/prisma';
+import { CrawlStatus } from '@prisma/client';
 
 
 

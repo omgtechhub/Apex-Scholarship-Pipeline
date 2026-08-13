@@ -3,7 +3,7 @@ import { articleGenerator } from '../ai/article-generator';
 import { createLogger } from '../logger/logger';
 import { toSlug, makeUniqueSlug } from '../utils/string.util';
 import { NotFoundError } from '../errors/base.error';
-import { ArticleStatus } from '../../../generated/prisma';
+import { ArticleStatus } from '@prisma/client';
 
 
 
