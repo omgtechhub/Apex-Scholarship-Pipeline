@@ -2,7 +2,7 @@
   "name": "apex-scholarship-automation-pipeline",
   "private": true,
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.19.0"
   },
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--use-system-ca next dev",
