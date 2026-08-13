@@ -10,22 +10,39 @@ import { createQualityWorker } from '../workers/quality.worker';
 import { createLogger } from '../logger/logger';
 
 const logger = createLogger('worker-runtime');
-const workers = [
-  createCrawlerWorker(),
-  createProcessingWorker(),
-  createValidationWorker(),
-  createAIWorker(),
-  createSEOWorker(),
-  createCleanupWorker(),
-  createNotificationWorker(),
-  createPublishingWorker(),
-  createQualityWorker(),
-];
 
-const shutdown = async () => {
-  await Promise.all(workers.map((worker) => worker.close()));
-  process.exit(0);
-};
-process.once('SIGINT', shutdown);
-process.once('SIGTERM', shutdown);
-logger.info({ count: workers.length }, 'Worker runtime started');
+let activeWorkers: Array<ReturnType<typeof createCrawlerWorker>> = [];
+
+export function startWorkers() {
+  if (activeWorkers.length > 0) return activeWorkers;
+  activeWorkers = [
+    createCrawlerWorker(),
+    createProcessingWorker(),
+    createValidationWorker(),
+    createAIWorker(),
+    createSEOWorker(),
+    createCleanupWorker(),
+    createNotificationWorker(),
+    createPublishingWorker(),
+    createQualityWorker(),
+  ];
+  logger.info({ count: activeWorkers.length }, 'Worker runtime started');
+  return activeWorkers;
+}
+
+export async function stopWorkers() {
+  if (activeWorkers.length > 0) {
+    await Promise.all(activeWorkers.map((worker) => worker.close()));
+    activeWorkers = [];
+  }
+}
+
+if (typeof require !== 'undefined' && require.main === module) {
+  startWorkers();
+  const shutdown = async () => {
+    await stopWorkers();
+    process.exit(0);
+  };
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
+}

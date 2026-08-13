@@ -1,5 +1,5 @@
 services:
-  # 1. Next.js Public & Admin API Web Service
+  # Next.js Public & Admin API + BullMQ Worker + 30-Minute Scheduler (Unified Free Web Service)
   - type: web
     name: apex-scholarship-api
     env: node
@@ -21,43 +21,7 @@ services:
         sync: false
       - key: PIPELINE_REFRESH_TOKEN_SECRET
         sync: false
-
-  # 2. BullMQ Pipeline Worker
-  - type: worker
-    name: apex-scholarship-worker
-    env: node
-    plan: free
-    buildCommand: npm install && npx playwright install-deps chromium && npx playwright install chromium && npx prisma generate
-    startCommand: npm run worker
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PIPELINE_ENV
-        value: production
-      - key: DATABASE_URL
+      - key: ADMIN_EMAIL
         sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: GROQ_API_KEY
-        sync: false
-      - key: PIPELINE_JWT_SECRET
-        sync: false
-      - key: PIPELINE_REFRESH_TOKEN_SECRET
-        sync: false
-
-  # 3. 30-Minute Crawl Scheduler
-  - type: worker
-    name: apex-scholarship-scheduler
-    env: node
-    plan: free
-    buildCommand: npm install && npx prisma generate
-    startCommand: npm run scheduler
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PIPELINE_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
+      - key: ADMIN_PASSWORD
         sync: false
