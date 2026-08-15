@@ -5,15 +5,31 @@ const logger = createLogger('redis');
 
 let redisClient: Redis | null = null;
 
+function resolveRedisOptions(rawUrl?: string) {
+  const url = rawUrl ?? process.env.REDIS_URL ?? 'redis://localhost:6379';
+  const isUpstash = url.includes('upstash.io');
+  const isRediss = url.startsWith('rediss://');
+  const finalUrl = (isUpstash && url.startsWith('redis://'))
+    ? url.replace('redis://', 'rediss://')
+    : url;
+
+  const tlsOption = (isUpstash || isRediss || finalUrl.startsWith('rediss://'))
+    ? { tls: { rejectUnauthorized: false } }
+    : {};
+
+  return { finalUrl, tlsOption };
+}
+
 export function getRedisClient(): Redis {
   if (redisClient) return redisClient;
 
-  const url = process.env.REDIS_URL ?? 'redis://localhost:6379';
+  const { finalUrl, tlsOption } = resolveRedisOptions();
 
-  redisClient = new Redis(url, {
+  redisClient = new Redis(finalUrl, {
     maxRetriesPerRequest: null, // Required for BullMQ
     enableReadyCheck: false,
     lazyConnect: false,
+    ...tlsOption,
     retryStrategy: (times: number) => {
       if (times > 10) {
         logger.error({ times }, 'Redis max retries exceeded');
@@ -31,10 +47,11 @@ export function getRedisClient(): Redis {
 }
 
 export function createRedisConnection(): Redis {
-  const url = process.env.REDIS_URL ?? 'redis://localhost:6379';
-  return new Redis(url, {
+  const { finalUrl, tlsOption } = resolveRedisOptions();
+  return new Redis(finalUrl, {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
+    ...tlsOption,
   });
 }
 
@@ -46,4 +63,3 @@ export async function closeRedis(): Promise<void> {
     redisClient = null;
   }
 }
-
