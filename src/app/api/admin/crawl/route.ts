@@ -2,8 +2,6 @@ import { NextRequest } from 'next/server';
 import prisma from '../../../../pipeline/database/prisma-client';
 import { requireAdmin, handleApiError, apiResponse } from '../../../../pipeline/middleware/auth.middleware';
 import { scheduler } from '../../../../pipeline/scheduler/scheduler';
-import QueueManager from '../../../../pipeline/queue/queue-manager';
-import { QUEUES } from '../../../../pipeline/queue/queue-names';
 import { CrawlStatus } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -46,24 +44,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check active/waiting jobs in BullMQ crawler queue
-    const crawlerQueue = QueueManager.getQueue(QUEUES.CRAWLER);
-    const existingJobs = await crawlerQueue.getJobs(['active', 'waiting', 'delayed']);
-    const activeSourceIdsInQueue = new Set(
-      existingJobs
-        .map((j) => (j.data as { sourceId?: string })?.sourceId)
-        .filter(Boolean) as string[]
-    );
-
-    // Also check database for running jobs in last 30 minutes
+    // Check database for active or running crawl jobs in the last 30 minutes
     const recentRunningJobs = await prisma.crawlerJob.findMany({
       where: {
-        status: CrawlStatus.RUNNING,
+        status: { in: [CrawlStatus.RUNNING, CrawlStatus.PENDING] },
         startedAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
       },
       select: { sourceId: true },
     });
-    const activeSourceIdsInDb = new Set(recentRunningJobs.map((j) => j.sourceId));
+    const activeSourceIds = new Set(recentRunningJobs.map((j) => j.sourceId));
 
     const results: Array<{
       sourceId: string;
@@ -78,7 +67,7 @@ export async function POST(req: NextRequest) {
     let alreadyRunningCount = 0;
 
     for (const source of sources) {
-      if (activeSourceIdsInQueue.has(source.id) || activeSourceIdsInDb.has(source.id)) {
+      if (activeSourceIds.has(source.id)) {
         alreadyRunningCount++;
         results.push({
           sourceId: source.id,
