@@ -54,42 +54,43 @@ export async function POST(req: NextRequest) {
     });
     const activeSourceIds = new Set(recentRunningJobs.map((j) => j.sourceId));
 
-    const results: Array<{
-      sourceId: string;
-      sourceName: string;
-      slug: string;
-      status: 'queued' | 'already_running';
-      jobId?: string;
-      message: string;
-    }> = [];
+    // Enqueue all source crawl jobs concurrently in parallel
+    const results = await Promise.all(
+      sources.map(async (source) => {
+        if (activeSourceIds.has(source.id)) {
+          return {
+            sourceId: source.id,
+            sourceName: source.name,
+            slug: source.slug,
+            status: 'already_running' as const,
+            message: 'Crawl job is already queued or currently running.',
+          };
+        }
 
-    let queuedCount = 0;
-    let alreadyRunningCount = 0;
+        try {
+          const jobId = await scheduler.triggerSource(source.id);
+          return {
+            sourceId: source.id,
+            sourceName: source.name,
+            slug: source.slug,
+            status: 'queued' as const,
+            jobId,
+            message: 'Crawl job successfully queued.',
+          };
+        } catch (err) {
+          return {
+            sourceId: source.id,
+            sourceName: source.name,
+            slug: source.slug,
+            status: 'already_running' as const,
+            message: `Failed to queue: ${(err as Error).message}`,
+          };
+        }
+      })
+    );
 
-    for (const source of sources) {
-      if (activeSourceIds.has(source.id)) {
-        alreadyRunningCount++;
-        results.push({
-          sourceId: source.id,
-          sourceName: source.name,
-          slug: source.slug,
-          status: 'already_running',
-          message: 'Crawl job is already queued or currently running.',
-        });
-        continue;
-      }
-
-      const jobId = await scheduler.triggerSource(source.id);
-      queuedCount++;
-      results.push({
-        sourceId: source.id,
-        sourceName: source.name,
-        slug: source.slug,
-        status: 'queued',
-        jobId,
-        message: 'Crawl job successfully queued.',
-      });
-    }
+    const queuedCount = results.filter((r) => r.status === 'queued').length;
+    const alreadyRunningCount = results.filter((r) => r.status === 'already_running').length;
 
     return apiResponse(
       {

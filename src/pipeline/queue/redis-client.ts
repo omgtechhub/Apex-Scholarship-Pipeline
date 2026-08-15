@@ -29,6 +29,8 @@ export function getRedisClient(): Redis {
     maxRetriesPerRequest: null, // Required for BullMQ
     enableReadyCheck: false,
     lazyConnect: false,
+    family: 4,
+    connectTimeout: 10000,
     ...tlsOption,
     retryStrategy: (times: number) => {
       if (times > 10) {
@@ -51,6 +53,8 @@ export function createRedisConnection(): Redis {
   return new Redis(finalUrl, {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
+    family: 4,
+    connectTimeout: 10000,
     ...tlsOption,
   });
 }
