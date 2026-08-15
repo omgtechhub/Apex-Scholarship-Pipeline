@@ -1,13 +1,11 @@
 import { Worker, Job } from 'bullmq';
 import { createRedisConnection } from '../queue/redis-client';
 import { QUEUES, JOB_NAMES } from '../queue/queue-names';
-import QueueManager from '../queue/queue-manager';
+import QueueManager, { rateLimitBackoffStrategy } from '../queue/queue-manager';
 import ArticleService from '../articles/article.service';
 import { createLogger } from '../logger/logger';
 import prisma from '../database/prisma-client';
 import { JobStatus, ArticleStatus } from '@prisma/client';
-
-
 
 const logger = createLogger('ai-worker');
 
@@ -18,7 +16,7 @@ export function createAIWorker() {
       const { scholarshipId } = job.data as { scholarshipId: string };
       const startedAt = new Date();
 
-      logger.info({ jobId: job.id, scholarshipId }, 'AI job started');
+      logger.info({ jobId: job.id, scholarshipId, attempt: job.attemptsMade + 1 }, 'AI job started');
 
       await prisma.queueHistory.updateMany({
         where: { jobId: job.id!, queue: QUEUES.AI },
@@ -54,12 +52,15 @@ export function createAIWorker() {
     {
       connection: createRedisConnection(),
       concurrency: 2,
-      limiter: { max: 10, duration: 60000 }, // rate limit AI calls
+      limiter: { max: 10, duration: 60000 },
+      settings: {
+        backoffStrategy: rateLimitBackoffStrategy,
+      },
     }
   );
 
   worker.on('failed', async (job, err) => {
-    logger.error({ jobId: job?.id, err: err.message }, 'AI job failed');
+    logger.error({ jobId: job?.id, err: err.message, attemptsMade: job?.attemptsMade }, 'AI job failed or delayed');
     if (job?.id) {
       await prisma.queueHistory.updateMany({
         where: { jobId: job.id, queue: QUEUES.AI },

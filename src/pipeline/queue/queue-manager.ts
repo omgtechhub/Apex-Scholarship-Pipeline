@@ -5,25 +5,48 @@ import { createLogger } from '../logger/logger';
 import prisma from '../database/prisma-client';
 import { JobStatus } from '@prisma/client';
 
-
-
 const logger = createLogger('queue-manager');
 
 const queues = new Map<string, Queue>();
 
-const DEFAULT_JOB_OPTIONS: JobsOptions = {
+export const DEFAULT_JOB_OPTIONS: JobsOptions = {
   attempts: 3,
   backoff: { type: 'exponential', delay: 5000 },
   removeOnComplete: { count: 100 },
   removeOnFail: { count: 500 },
 };
 
+export const AI_JOB_OPTIONS: JobsOptions = {
+  attempts: 10,
+  backoff: { type: 'rateLimitBackoff' },
+  removeOnComplete: { count: 100 },
+  removeOnFail: { count: 500 },
+};
+
+export function rateLimitBackoffStrategy(attemptsMade: number, _type?: string, err?: Error): number {
+  if (
+    err &&
+    (err.message.includes('429') ||
+      err.message.includes('rate_limit_exceeded') ||
+      err.message.includes('Rate limit reached'))
+  ) {
+    // Delay 15 minutes (900,000 ms) for HTTP 429 rate limit errors
+    return 15 * 60 * 1000;
+  }
+  // Standard exponential backoff for non-429 errors (5s, 10s, 20s, 40s)
+  return Math.min(Math.pow(2, attemptsMade - 1) * 5000, 60000);
+}
+
 function getQueue(name: QueueName): Queue {
   if (queues.has(name)) return queues.get(name)!;
+
+  const defaultOptions = name === QUEUES.AI ? AI_JOB_OPTIONS : DEFAULT_JOB_OPTIONS;
+
   const q = new Queue(name, {
     connection: createRedisConnection(),
-    defaultJobOptions: DEFAULT_JOB_OPTIONS,
+    defaultJobOptions: defaultOptions,
   });
+
   queues.set(name, q);
   return q;
 }
@@ -38,7 +61,8 @@ export const QueueManager = {
     options?: JobsOptions
   ) {
     const queue = getQueue(queueName);
-    const mergedOptions = { ...DEFAULT_JOB_OPTIONS, ...options };
+    const baseOptions = queueName === QUEUES.AI ? AI_JOB_OPTIONS : DEFAULT_JOB_OPTIONS;
+    const mergedOptions = { ...baseOptions, ...options };
     const job = await queue.add(jobName, data, mergedOptions);
 
     // Record in queue history
