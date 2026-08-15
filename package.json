@@ -17,6 +17,7 @@
     "worker": "cross-env NODE_OPTIONS=--use-system-ca tsx src/pipeline/runtime/worker.ts",
     "scheduler": "cross-env NODE_OPTIONS=--use-system-ca tsx src/pipeline/runtime/scheduler.ts",
     "api": "cross-env NODE_OPTIONS=--use-system-ca next dev",
+    "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts"
   },
   "prisma": {
