@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--use-system-ca next dev",
     "build": "next build",
-    "start": "cross-env NODE_OPTIONS=--use-system-ca next start -H 0.0.0.0",
+    "start": "concurrently -k -p \"[{name}]\" -n \"NEXT,WORKER,SCHEDULER\" -c \"blue,green,magenta\" \"cross-env NODE_OPTIONS=--use-system-ca next start -H 0.0.0.0\" \"cross-env NODE_OPTIONS=--use-system-ca tsx src/pipeline/runtime/worker.ts\" \"cross-env NODE_OPTIONS=--use-system-ca tsx src/pipeline/runtime/scheduler.ts\"",
     "postinstall": "prisma generate",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -48,6 +48,7 @@
     "bcryptjs": "^3.0.3",
     "bullmq": "5.41.0",
     "cheerio": "1.2.0",
+    "concurrently": "^10.0.5",
     "cors": "^2.8.6",
     "cron-parser": "^5.7.0",
     "cross-env": "^7.0.3",
