@@ -5,16 +5,42 @@ const logger = createLogger('redis');
 
 let redisClient: Redis | null = null;
 
-function resolveRedisOptions(rawUrl?: string) {
-  const url = rawUrl ?? process.env.REDIS_URL ?? 'redis://localhost:6379';
-  const isUpstash = url.includes('upstash.io');
-  const isRediss = url.startsWith('rediss://');
-  const finalUrl = (isUpstash && url.startsWith('redis://'))
-    ? url.replace('redis://', 'rediss://')
-    : url;
+/**
+ * Normalizes any Redis connection string input, stripping CLI prefixes
+ * like '--tls -u' and extracting the pure redis:// or rediss:// URL.
+ */
+export function normalizeRedisUrl(inputUrl?: string): string {
+  const raw = (inputUrl ?? process.env.REDIS_URL ?? '').trim();
+  if (!raw) {
+    throw new Error('REDIS_URL environment variable is missing or empty');
+  }
 
-  const tlsOption = (isUpstash || isRediss || finalUrl.startsWith('rediss://'))
-    ? { tls: { rejectUnauthorized: false } }
+  // Extract embedded redis:// or rediss:// URL (ignoring CLI flags like --tls -u)
+  const match = raw.match(/(rediss?:\/\/[^\s"']+)/i);
+  if (!match) {
+    throw new Error(
+      `Invalid REDIS_URL format: "${raw}". Expected a URL starting with redis:// or rediss://`
+    );
+  }
+
+  let extractedUrl = match[1].trim();
+
+  // If Upstash domain, upgrade scheme to rediss:// for TLS
+  const isUpstash = extractedUrl.toLowerCase().includes('upstash.io');
+  if (isUpstash && extractedUrl.toLowerCase().startsWith('redis://')) {
+    extractedUrl = extractedUrl.replace(/^redis:\/\//i, 'rediss://');
+  }
+
+  return extractedUrl;
+}
+
+export function resolveRedisOptions(rawUrl?: string) {
+  const finalUrl = normalizeRedisUrl(rawUrl);
+  const isUpstash = finalUrl.toLowerCase().includes('upstash.io');
+  const isRediss = finalUrl.toLowerCase().startsWith('rediss://');
+
+  const tlsOption = (isUpstash || isRediss)
+    ? { tls: {} }
     : {};
 
   return { finalUrl, tlsOption };

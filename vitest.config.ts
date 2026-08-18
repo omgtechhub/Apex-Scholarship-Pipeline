@@ -11,6 +11,7 @@ export default defineConfig({
       'src/__tests__/pipeline.test.ts',
       'src/__tests__/quality.test.ts',
       'src/__tests__/e2e-pipeline.test.ts',
+      'src/__tests__/redis-normalization.test.ts',
     ],
   },
 });
