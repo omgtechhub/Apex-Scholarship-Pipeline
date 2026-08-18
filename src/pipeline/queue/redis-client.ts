@@ -76,13 +76,19 @@ export function getRedisClient(): Redis {
 
 export function createRedisConnection(): Redis {
   const { finalUrl, tlsOption } = resolveRedisOptions();
-  return new Redis(finalUrl, {
+  const client = new Redis(finalUrl, {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
     family: 4,
     connectTimeout: 10000,
     ...tlsOption,
   });
+
+  client.on('error', (err) => {
+    logger.error({ err }, 'Redis worker connection error');
+  });
+
+  return client;
 }
 
 export async function closeRedis(): Promise<void> {
