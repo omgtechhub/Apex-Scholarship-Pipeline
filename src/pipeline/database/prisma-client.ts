@@ -8,7 +8,13 @@ const connectionString =
   process.env.DATABASE_URL ??
   'postgresql://postgres:postgres@localhost:5432/scholarship_pipeline?schema=public';
 
-const pool = new Pool({ connectionString, allowExitOnIdle: true });
+const isSslRequired =
+  connectionString.includes('sslmode=') ||
+  connectionString.includes('neon.tech');
+
+const ssl = isSslRequired ? { rejectUnauthorized: true } : undefined;
+
+const pool = new Pool({ connectionString, ssl, allowExitOnIdle: true });
 const adapter = new PrismaPg(pool);
 
 
