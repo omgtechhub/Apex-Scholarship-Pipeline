@@ -52,13 +52,14 @@ services:
       - key: PIPELINE_JWT_SECRET
         sync: false
 
-  # Cron Scheduler (Background Worker)
-  - type: worker
+  # Cron Scheduler (Render Cron Job)
+  - type: cron
     name: apex-scholarship-scheduler
     env: node
     plan: free
+    schedule: "*/30 * * * *"
     buildCommand: npm install --include=dev && npx prisma generate
-    startCommand: npm run scheduler
+    startCommand: npm run scheduler:cron
     envVars:
       - key: NODE_VERSION
         value: 22.22.0

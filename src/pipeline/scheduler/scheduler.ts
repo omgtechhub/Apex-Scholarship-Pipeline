@@ -65,7 +65,7 @@ export class Scheduler {
     return job.id!;
   }
 
-  private async enqueueCleanup(): Promise<void> {
+  async enqueueCleanup(): Promise<void> {
     await QueueManager.add(QUEUES.CLEANUP, JOB_NAMES.CLEANUP_EXPIRED, { task: 'cleanup-expired' });
     await QueueManager.add(QUEUES.CLEANUP, JOB_NAMES.CLEANUP_LOGS, { task: 'cleanup-logs' });
   }
