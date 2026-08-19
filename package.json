@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--use-system-ca next dev",
     "build": "next build",
-    "start": "concurrently -k -p \"[{name}]\" -n \"NEXT,WORKER,SCHEDULER\" -c \"blue,green,magenta\" \"cross-env NODE_OPTIONS=--use-system-ca next start -H 0.0.0.0 -p 10000\" \"cross-env NODE_OPTIONS=--use-system-ca tsx src/pipeline/runtime/worker.ts\" \"cross-env NODE_OPTIONS=--use-system-ca tsx src/pipeline/runtime/scheduler.ts\"",
+    "start": "cross-env NODE_OPTIONS=--use-system-ca next start -H 0.0.0.0",
+    "start:all": "concurrently -p \"[{name}]\" -n \"NEXT,WORKER,SCHEDULER\" -c \"blue,green,magenta\" \"cross-env NODE_OPTIONS=--use-system-ca next start -H 0.0.0.0\" \"cross-env NODE_OPTIONS=--use-system-ca tsx src/pipeline/runtime/worker.ts\" \"cross-env NODE_OPTIONS=--use-system-ca tsx src/pipeline/runtime/scheduler.ts\"",
     "postinstall": "prisma generate",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

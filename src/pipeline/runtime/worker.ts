@@ -15,19 +15,24 @@ let activeWorkers: Array<ReturnType<typeof createCrawlerWorker>> = [];
 
 export function startWorkers() {
   if (activeWorkers.length > 0) return activeWorkers;
-  activeWorkers = [
-    createCrawlerWorker(),
-    createProcessingWorker(),
-    createValidationWorker(),
-    createAIWorker(),
-    createSEOWorker(),
-    createCleanupWorker(),
-    createNotificationWorker(),
-    createPublishingWorker(),
-    createQualityWorker(),
-  ];
-  logger.info({ count: activeWorkers.length }, 'Worker runtime started');
-  return activeWorkers;
+  try {
+    activeWorkers = [
+      createCrawlerWorker(),
+      createProcessingWorker(),
+      createValidationWorker(),
+      createAIWorker(),
+      createSEOWorker(),
+      createCleanupWorker(),
+      createNotificationWorker(),
+      createPublishingWorker(),
+      createQualityWorker(),
+    ];
+    logger.info({ count: activeWorkers.length }, 'Worker runtime started');
+    return activeWorkers;
+  } catch (err) {
+    logger.error({ err }, 'Worker runtime initialization failed');
+    throw err;
+  }
 }
 
 export async function stopWorkers() {
@@ -38,7 +43,12 @@ export async function stopWorkers() {
 }
 
 if (typeof require !== 'undefined' && require.main === module) {
-  startWorkers();
+  try {
+    startWorkers();
+  } catch (err) {
+    logger.error({ err }, 'Worker process startup failed');
+    process.exit(1);
+  }
   const shutdown = async () => {
     await stopWorkers();
     process.exit(0);

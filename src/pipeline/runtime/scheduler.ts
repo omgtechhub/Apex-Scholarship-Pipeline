@@ -1,4 +1,7 @@
 import { scheduler } from '../scheduler/scheduler';
+import { createLogger } from '../logger/logger';
+
+const logger = createLogger('scheduler-runtime');
 
 export function startSchedulerRuntime() {
   scheduler.start();
@@ -9,7 +12,12 @@ export function stopSchedulerRuntime() {
 }
 
 if (typeof require !== 'undefined' && require.main === module) {
-  startSchedulerRuntime();
+  try {
+    startSchedulerRuntime();
+  } catch (err) {
+    logger.error({ err }, 'Scheduler process startup failed');
+    process.exit(1);
+  }
   const shutdown = () => {
     stopSchedulerRuntime();
     process.exit(0);
