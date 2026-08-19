@@ -56,7 +56,7 @@ services:
   - type: cron
     name: apex-scholarship-scheduler
     env: node
-    plan: free
+    plan: starter
     schedule: "*/30 * * * *"
     buildCommand: npm install --include=dev && npx prisma generate
     startCommand: npm run scheduler:cron
