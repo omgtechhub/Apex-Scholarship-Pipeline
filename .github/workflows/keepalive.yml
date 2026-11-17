@@ -55,21 +55,51 @@ permissions:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Must exceed the in-run ping window below, or the job is killed mid-way.
+    timeout-minutes: 20
     steps:
       - name: Ping the API
         run: |
-          # --max-time 120 covers a full cold start: if the instance *was*
-          # asleep this request is the one that pays for waking it, and that
-          # is the point. 404 is the expected success code.
-          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 120 \
-                   --retry 2 --retry-delay 15 --retry-all-errors \
-                   'https://apex-scholarship-api.onrender.com/_keepalive')
-          echo "GET /_keepalive -> HTTP $code"
-          # Anything that answered at all means the service is up. A 5xx or an
-          # empty reply means it is not, and this job should go red so the
-          # failure is visible instead of silently degrading the live site.
-          case "$code" in
-            2??|3??|4??) echo "Service is awake." ;;
-            *) echo "::error::Scholarship API did not respond healthily (HTTP $code)."; exit 1 ;;
-          esac
+          # Each run pings several times rather than once, because GitHub's
+          # cron is best-effort and measurably unreliable at this cadence:
+          # after this workflow landed, four consecutive */10 slots passed with
+          # no run at all. The docs are explicit that `schedule` can be delayed
+          # under load, and short intervals are deprioritised.
+          #
+          # Four pings four minutes apart means one run alone keeps the service
+          # awake for ~12 minutes, so the 15-minute idle window survives a
+          # scheduler slip of roughly 25 minutes instead of 5. If a later run
+          # does arrive mid-loop, the concurrency group above cancels this one
+          # and coverage simply continues from the newer run.
+          PINGS=4
+          GAP=240
+          failures=0
+
+          for i in $(seq 1 "$PINGS"); do
+            # --max-time 120 covers a full cold start: if the instance *was*
+            # asleep this request is the one that pays for waking it, and that
+            # is the point. 404 is the expected success code.
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 120 \
+                     --retry 2 --retry-delay 15 --retry-all-errors \
+                     'https://apex-scholarship-api.onrender.com/_keepalive' || echo 000)
+            echo "ping $i/$PINGS: GET /_keepalive -> HTTP $code"
+
+            # Anything that answered at all means the service is up. A 5xx or an
+            # empty reply means it is not.
+            case "$code" in
+              2??|3??|4??) : ;;
+              *) failures=$((failures + 1)) ;;
+            esac
+
+            [ "$i" -lt "$PINGS" ] && sleep "$GAP"
+          done
+
+          # Go red only if EVERY ping failed. One bad reply mid-loop is usually
+          # a Render restart, and failing on that would cry wolf; total silence
+          # means the service is genuinely down and should be visible rather
+          # than silently degrading the live site to its six fallbacks.
+          if [ "$failures" -ge "$PINGS" ]; then
+            echo "::error::Scholarship API did not respond to any of $PINGS pings."
+            exit 1
+          fi
+          echo "Service is awake ($((PINGS - failures))/$PINGS pings answered)."
