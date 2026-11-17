@@ -1,0 +1,116 @@
+# Runs the scholarship pipeline on a schedule, replacing two Render services.
+#
+# WHY THIS EXISTS
+# ---------------
+# The pipeline was designed as a long-running `worker` (nine BullMQ consumers)
+# plus a `cron` service to feed it. render.yaml declares both as `plan: starter`
+# — roughly $14/month — and, as it turns out, **neither was ever created**. Only
+# the web service existed, so nothing ever consumed the queue and not a single
+# article reached production between August and November 2026.
+#
+# A CI runner can host the same work for free: this repo is public, so GitHub
+# Actions minutes are unmetered. src/pipeline/runtime/cycle.ts starts the
+# workers, runs one scheduler tick, drains the queues and exits.
+#
+# WHY EVERY TWO HOURS AND NOT EVERY 30 MINUTES
+# --------------------------------------------
+# Three reasons, and the first is the one that matters:
+#
+#   1. GitHub's cron is best-effort. A previous workflow in this repo missed
+#      seven consecutive */10 slots with the config verifiably correct, so a
+#      tight cadence buys nothing — the runs simply do not happen. Twelve
+#      generous attempts a day survive heavy dropping far better than 48 tight
+#      ones.
+#   2. scheduler.tick() self-throttles. It only enqueues sources whose
+#      nextCrawlAt is due and pushes it forward by crawlIntervalMin (30 min), so
+#      running more often than the interval mostly produces empty cycles.
+#   3. No overlap. CYCLE_MAX_MINUTES below is 45, comfortably inside the
+#      two-hour gap, so a long cycle can never collide with the next one.
+#
+# An empty cycle exits in about 30 seconds, so the common case is cheap.
+name: Pipeline cycle
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      maxMinutes:
+        description: 'Time budget for the cycle (minutes)'
+        required: false
+        default: '45'
+      cleanup:
+        description: 'Also enqueue the expired/log cleanup jobs'
+        type: boolean
+        required: false
+        default: false
+
+# Never cancel a cycle in flight. A cancelled run abandons articles mid-chain in
+# GENERATING; they do recover, because article.service.ts now reuses a
+# non-PUBLISHED row instead of creating another, but letting a run finish is
+# cheaper than relying on that.
+concurrency:
+  group: pipeline-cycle
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    # Must exceed CYCLE_MAX_MINUTES, or the runner kills the cycle before it can
+    # shut down cleanly and report what it did.
+    timeout-minutes: 70
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.0'
+          cache: npm
+
+      # --include=dev because the entry point runs through tsx.
+      - name: Install dependencies
+        run: npm ci --include=dev
+
+      # The crawler adapters fall back to Playwright when a site blocks plain
+      # HTTP, so unlike the API deployment this job genuinely needs a browser.
+      # --with-deps pulls the system libraries chromium needs on the runner.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      # Fail loudly on a missing secret rather than letting it surface as an
+      # obscure BullMQ connection error forty lines into the cycle log. Every
+      # production failure in this pipeline's history was a silent one; a
+      # missing credential should not be another.
+      - name: Check required secrets are present
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          missing=()
+          [ -n "$DATABASE_URL" ] || missing+=(DATABASE_URL)
+          [ -n "$REDIS_URL" ]    || missing+=(REDIS_URL)
+          [ -n "$GROQ_API_KEY" ] || missing+=(GROQ_API_KEY)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error title=Missing repository secrets::${missing[*]} not set. Add them under Settings > Secrets and variables > Actions, or with: gh secret set <NAME> --repo ${{ github.repository }}"
+            exit 1
+          fi
+          echo "All three required secrets are present."
+
+      - name: Run one pipeline cycle
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          NODE_ENV: production
+          PIPELINE_ENV: production
+          CYCLE_MAX_MINUTES: ${{ github.event.inputs.maxMinutes || '45' }}
+          CYCLE_CLEANUP: ${{ github.event.inputs.cleanup == 'true' && '1' || '0' }}
+        run: npm run cycle
