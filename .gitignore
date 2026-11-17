@@ -9,3 +9,5 @@ src/generated/
 dist/
 scratch/
 tsconfig.tsbuildinfo
+.vercel
+.env*
