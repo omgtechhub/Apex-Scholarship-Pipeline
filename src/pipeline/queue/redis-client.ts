@@ -148,6 +148,39 @@ export async function assertRedisReachable(timeoutMs = 15000): Promise<void> {
       ),
     ]);
     logger.info({ host }, 'Redis reachable');
+
+    /*
+     * Warn if Redis is allowed to evict keys.
+     *
+     * BullMQ's docs are blunt about this: `maxmemory-policy` must be
+     * `noeviction`, and it is "the only setting that guarantees the correct
+     * behavior of the queues". Anything else lets Redis drop queue keys under
+     * memory pressure, and the symptom is jobs quietly vanishing mid-chain —
+     * indistinguishable from the pipeline simply not working, which this
+     * project has already spent three months mistaking for other causes.
+     *
+     * It matters most on managed Redis: Redis Cloud defaults new databases to
+     * `volatile-lru`, not `noeviction`.
+     *
+     * Advisory only. Many managed providers block CONFIG GET for tenants, so a
+     * refusal here says nothing about the policy and must not fail the run.
+     */
+    try {
+      const config = (await probe.config('GET', 'maxmemory-policy')) as unknown as string[];
+      const policy = Array.isArray(config) ? config[1] : undefined;
+      if (policy && policy !== 'noeviction') {
+        logger.warn({ policy }, 'Redis maxmemory-policy is not noeviction — BullMQ may lose jobs');
+        console.log(
+          `::warning title=Redis eviction policy::maxmemory-policy is "${policy}", not "noeviction". ` +
+            'BullMQ requires noeviction; with eviction enabled Redis can drop queue keys and jobs will ' +
+            'disappear silently. Change it in your Redis provider settings.'
+        );
+      } else if (policy) {
+        logger.info({ policy }, 'Redis eviction policy OK');
+      }
+    } catch {
+      logger.debug('Could not read maxmemory-policy (provider likely restricts CONFIG) — skipping check');
+    }
   } catch (err) {
     throw new Error(
       `Redis is unreachable at ${host} (${(err as Error).message}). ` +
