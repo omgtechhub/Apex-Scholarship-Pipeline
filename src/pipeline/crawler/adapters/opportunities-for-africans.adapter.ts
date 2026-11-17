@@ -4,6 +4,80 @@ import { parseDate } from '../../utils/date.util';
 
 const BASE_URL = 'https://opportunitiesforafricans.com';
 
+/*
+ * WordPress archive pages are not scholarships.
+ *
+ * The listing selector below includes `[class*="scholarship"]`, which on an
+ * archive page also matches the page's own section wrapper — and
+ * `.find('a[href]').first()` then picks up the category link rather than a post
+ * permalink. The result was a "scholarship" titled "Scholarships" whose
+ * officialUrl was https://opportunitiesforafricans.com/category/scholarships/,
+ * which reached the live site as a card, got an AI article written about it, and
+ * was published.
+ *
+ * It was rejected by hand on 17 Nov 2026, and the very next crawl recreated it —
+ * which is the point: rejecting the row treats the symptom, and only a guard
+ * here stops it coming back every 30 minutes.
+ */
+const TAXONOMY_PATH = /\/(category|tag|author|page|search|feed)(\/|$)/i;
+
+/**
+ * Titles that are a section name rather than the name of an award.
+ *
+ * An archive wrapper's heading is the section it lists ("Scholarships",
+ * "Fully Funded Scholarships"), so a title that is nothing but those words
+ * describes a page, not an opportunity. Real entries on this site read like
+ * "Chevening Scholarships 2027 for Developing Countries" — they always carry a
+ * programme or sponsor name alongside the category word.
+ */
+const SECTION_TITLES = new Set([
+  'scholarship',
+  'scholarships',
+  'fully funded scholarships',
+  'fully funded scholarship',
+  'opportunity',
+  'opportunities',
+  'fellowship',
+  'fellowships',
+  'grants',
+  'latest scholarships',
+  'all scholarships',
+]);
+
+/** True when a candidate link is an archive/taxonomy page rather than a post. */
+export function isListingUrl(url: string, listingUrls: readonly string[] = []): boolean {
+  let path: string;
+  try {
+    path = new URL(url).pathname.replace(/\/+$/, '');
+  } catch {
+    return true; // unparseable: not a usable permalink either way
+  }
+
+  // The pages we deliberately started from can never themselves be entries.
+  const normalized = (u: string) => u.replace(/\/+$/, '').toLowerCase();
+  if (listingUrls.some((l) => normalized(l) === normalized(url))) return true;
+
+  if (TAXONOMY_PATH.test(path + '/')) return true;
+
+  // A bare section path like /scholarships has one segment; real posts on this
+  // site are /some-programme-name-2027 or deeper.
+  const segments = path.split('/').filter(Boolean);
+  if (segments.length === 0) return true;
+  if (segments.length === 1 && SECTION_TITLES.has(segments[0].replace(/-/g, ' '))) return true;
+
+  return false;
+}
+
+/** True when a title names a section rather than an award. */
+export function isSectionTitle(title: string): boolean {
+  const cleaned = title
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned.length === 0 || SECTION_TITLES.has(cleaned);
+}
+
 export class OpportunitiesForAfricansAdapter extends BaseCrawler {
   constructor(config: Partial<CrawlerConfig> & { sourceId: string }) {
     super({
@@ -36,10 +110,20 @@ export class OpportunitiesForAfricansAdapter extends BaseCrawler {
           const title = titleEl.text().trim();
           if (!title) return;
 
-          const linkEl = $el.find('a[href]').first();
-          const href = linkEl.attr('href') ?? titleEl.find('a').attr('href') ?? '';
+          // Prefer the link inside the heading: on an archive page the first
+          // <a> in a wrapper can be navigation, while the title's own link is
+          // the post permalink.
+          const href = titleEl.find('a[href]').attr('href') ?? $el.find('a[href]').first().attr('href') ?? '';
           const url = this.resolveUrl(href);
           if (!url) return;
+
+          // Drop archive/taxonomy pages and section headings. Without this the
+          // category index itself becomes a published scholarship — see
+          // isListingUrl for the full story.
+          if (isListingUrl(url, listingUrls) || isSectionTitle(title)) {
+            this.logger.debug({ url, title }, 'Skipping listing page masquerading as a scholarship');
+            return;
+          }
 
           const description = $el
             .find('.entry-summary, .post-excerpt, p')

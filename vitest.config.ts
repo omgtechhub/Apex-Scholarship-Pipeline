@@ -14,6 +14,7 @@ export default defineConfig({
       'src/__tests__/redis-normalization.test.ts',
       'src/__tests__/normalization.test.ts',
       'src/__tests__/daad-adapter.test.ts',
+      'src/__tests__/ofa-adapter.test.ts',
     ],
   },
 });
