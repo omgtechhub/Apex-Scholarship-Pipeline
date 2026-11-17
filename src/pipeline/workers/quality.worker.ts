@@ -75,6 +75,26 @@ export function createQualityWorker() {
 
       if (result.status === 'PASS') {
         await prisma.article.update({ where: { id: articleId }, data: { status: ArticleStatus.APPROVED } });
+
+        /*
+         * Hand off to publishing — the step that was missing.
+         *
+         * Every other stage chains to the next one (crawler -> processing ->
+         * validation -> ai -> seo -> quality), but this branch stopped at
+         * APPROVED and enqueued nothing, so the automated pipeline could never
+         * reach PUBLISHED. The PUBLISHING queue had exactly one producer: the
+         * manual, auth-gated POST /api/articles/[id]/publish endpoint.
+         *
+         * That is why a crawl could run end to end, generate good articles, and
+         * still leave the public API returning zero scholarships — the gate it
+         * enforces (ACTIVE scholarship + at least one PUBLISHED article) was
+         * unreachable without someone calling the endpoint by hand.
+         *
+         * Only PASS auto-publishes. REVIEW still parks at QUALITY_REVIEW and
+         * REJECT at REJECTED, so the quality gate keeps its veto; this restores
+         * the chain without removing the check.
+         */
+        await QueueManager.add(QUEUES.PUBLISHING, JOB_NAMES.PUBLISH_ARTICLE, { articleId });
       } else if (result.status === 'REJECT') {
         await prisma.article.update({
           where: { id: articleId },

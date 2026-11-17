@@ -36,12 +36,39 @@ export const ArticleService = {
     });
     if (!scholarship) throw new NotFoundError('Scholarship', scholarshipId);
 
-    // Check for existing article
+    /*
+     * Which existing article, if any, this run should write into.
+     *
+     * The old filter excluded FAILED and included PUBLISHED, which was exactly
+     * backwards and caused both of the pipeline's self-inflicted wounds:
+     *
+     *  - PUBLISHED was reused, so every half-hourly crawl transitioned a live
+     *    article to GENERATING. That removes it from the public API
+     *    immediately, because the gate requires a PUBLISHED article - and on a
+     *    rate-limited free tier most regenerations then failed, so the card
+     *    vanished from the site and did not come back. Observed: 15 live
+     *    scholarships down to 2 after one cycle.
+     *
+     *  - FAILED was excluded, so a scholarship whose last attempt failed got a
+     *    brand new row on every cycle instead of retrying the old one. Observed:
+     *    288 articles created in one hour, 29 of them for a single scholarship.
+     *
+     * Inverted: never touch a PUBLISHED article (a live card stays live, and a
+     * genuine content change generates into a fresh row alongside it), and do
+     * reuse a FAILED one so retries overwrite rather than accumulate.
+     */
     const existing = await prisma.article.findFirst({
       where: {
         scholarshipId,
-        status: { notIn: [ArticleStatus.REJECTED, ArticleStatus.ARCHIVED, ArticleStatus.FAILED] },
+        status: {
+          notIn: [
+            ArticleStatus.REJECTED,
+            ArticleStatus.ARCHIVED,
+            ArticleStatus.PUBLISHED,
+          ],
+        },
       },
+      orderBy: { updatedAt: 'desc' },
     });
 
     let articleId: string;

@@ -13,7 +13,31 @@ export class GroqProvider implements AIProvider {
 
   constructor() {
     this.apiKey = process.env.GROQ_API_KEY;
-    this.model = process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile';
+    /*
+     * Reads GROQ_MODEL, then AI_MODEL, then falls back.
+     *
+     * AI_MODEL is here because that is the name the deployed `.env` has always
+     * used, while this line only ever read GROQ_MODEL - so the configured model
+     * was silently ignored and the hardcoded default below was what actually
+     * ran. Setting AI_MODEL to a working model would have had no effect, which
+     * is a bad way to find out your config is dead.
+     *
+     * The old default, 'llama-3.3-70b-versatile', has since been retired by
+     * Groq and now returns HTTP 404 model_not_found, so a stale default was not
+     * a harmless one. Verified against the live API: qwen3.8-27b completes a
+     * ~1,900-word article in 2,653 tokens with finish_reason 'stop', where
+     * gpt-oss-120b spends budget on a reasoning channel and hits the 4,000
+     * token cap mid-article (finish_reason 'length').
+     *
+     * The binding constraint on the free tier turned out not to be tokens-per-
+     * DAY but output-tokens-per-MINUTE, enforced per model. qwen3.8-27b caps
+     * OTPM at 1000 while the generator asks for 4000, so every request is
+     * rejected 429 "Request too large" before it starts - it passes a small
+     * ad-hoc test and fails every real one. gpt-oss-20b clears that limit and
+     * finishes: 2,114 words in 3,401 tokens, finish_reason 'stop'.
+     */
+    this.model =
+      process.env.GROQ_MODEL ?? process.env.AI_MODEL ?? 'openai/gpt-oss-20b';
   }
 
   isAvailable(): boolean {

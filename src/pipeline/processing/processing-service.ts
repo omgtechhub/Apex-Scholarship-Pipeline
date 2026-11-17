@@ -132,10 +132,31 @@ export async function processScholarship(
       },
     });
 
-    // Enqueue for article regeneration if content changed significantly
-    await QueueManager.add(QUEUES.VALIDATION, JOB_NAMES.VALIDATE_SCHOLARSHIP, {
-      scholarshipId: existingId,
-    });
+    /*
+     * Regenerate only when the source actually changed.
+     *
+     * This comment already said "if content changed significantly" - the guard
+     * itself was never written, so every scholarship was re-queued for article
+     * generation on every half-hourly crawl whether or not a single field had
+     * moved. With 29 scholarships and 5 sources that is a full regeneration
+     * cycle every 30 minutes, for content nobody had touched since August.
+     *
+     * `contentHash` is computed by the normaliser over the scholarship's own
+     * fields, so an identical hash means the crawl saw exactly what is already
+     * stored. The scholarship row is still updated above (lastSeen, status,
+     * organization), it just no longer drags the article through a needless
+     * regeneration that costs AI quota and risks taking a live card offline.
+     */
+    if (existing.contentHash === normalized.contentHash) {
+      logger.debug(
+        { id: existingId },
+        'Scholarship unchanged since last crawl — skipping article regeneration'
+      );
+    } else {
+      await QueueManager.add(QUEUES.VALIDATION, JOB_NAMES.VALIDATE_SCHOLARSHIP, {
+        scholarshipId: existingId,
+      });
+    }
 
     logger.info({ id: existingId, changedFields: dedupe.changedFields }, 'Scholarship updated');
     return {

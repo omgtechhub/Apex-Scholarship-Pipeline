@@ -18,8 +18,26 @@ export async function GET(req: NextRequest) {
     const fundingType = url.searchParams.get('fundingType')?.trim();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    /*
+     * EXPIRED stays visible on purpose.
+     *
+     * The gate used to require ACTIVE, which made expiry a *deletion* as far as
+     * the public site was concerned: a card that had been live for weeks simply
+     * vanished the moment its deadline passed. Two separate jobs do that —
+     * `validation.worker` expires a scholarship it finds past deadline, and the
+     * nightly `cleanup-expired` job expires them in bulk — so cards disappeared
+     * on their own schedule with nothing in the site's control.
+     *
+     * Once something has been published it stays published. The site already
+     * renders a passed deadline as "Deadline passed:" in red, so an expired
+     * entry degrades into useful archive content rather than a hole in the
+     * grid, and the EXPIRED flag is still there for anyone who wants to filter.
+     *
+     * ARCHIVED and REJECTED remain excluded: those are deliberate removals, not
+     * the passage of time.
+     */
     const where: any = {
-      status: ScholarshipStatus.ACTIVE,
+      status: { in: [ScholarshipStatus.ACTIVE, ScholarshipStatus.EXPIRED] },
       articles: {
         some: {
           status: ArticleStatus.PUBLISHED,
