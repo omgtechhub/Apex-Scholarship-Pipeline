@@ -30,7 +30,7 @@ import 'dotenv/config';
 import { startWorkers, stopWorkers } from './worker';
 import { scheduler } from '../scheduler/scheduler';
 import QueueManager from '../queue/queue-manager';
-import { closeRedis } from '../queue/redis-client';
+import { closeRedis, assertRedisReachable } from '../queue/redis-client';
 import prisma, { disconnectDatabase } from '../database/prisma-client';
 import { createLogger } from '../logger/logger';
 
@@ -70,6 +70,12 @@ const POLL_SECONDS = envInt('CYCLE_POLL_SECONDS', 10);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Grace period for in-flight worker handlers to finish their own writes. */
+const SETTLE_MS = 3000;
+
+let shuttingDown = false;
+let cycleSucceeded = false;
+
 interface Outstanding {
   total: number;
   perQueue: Record<string, number>;
@@ -103,6 +109,32 @@ export async function runCycle(): Promise<void> {
   const startedAt = new Date();
   const deadline = startedAt.getTime() + MAX_MINUTES * 60_000;
 
+  /*
+   * Do not let a straggler sink a cycle that already succeeded.
+   *
+   * BullMQ's worker.close() resolves once the current job's handler returns,
+   * but handlers fire their own follow-up writes — queue history, metrics — and
+   * those can land after disconnectDatabase() has ended the pg pool. The result
+   * is an uncaught "Cannot use a pool after calling end on the pool" that kills
+   * the process with exit 1 *after* the work is done and reported, turning a
+   * good run red. Observed exactly that: 3 articles published, summary printed,
+   * then exit 1.
+   *
+   * So: once shutdown has begun, a late error is logged and the already-decided
+   * exit code stands. Before shutdown it still fails the run, because an
+   * uncaught error mid-cycle is real.
+   */
+  const onLateError = (err: unknown) => {
+    if (shuttingDown) {
+      logger.warn({ err }, 'Ignoring error raised after the cycle finished');
+      process.exit(cycleSucceeded ? 0 : 1);
+    }
+    logger.error({ err }, 'Uncaught error during cycle');
+    process.exit(1);
+  };
+  process.on('uncaughtException', onLateError);
+  process.on('unhandledRejection', onLateError);
+
   logger.info(
     { maxMinutes: MAX_MINUTES, idleChecks: IDLE_CHECKS, pollSeconds: POLL_SECONDS },
     'Cycle starting'
@@ -111,6 +143,17 @@ export async function runCycle(): Promise<void> {
   let hitDeadline = false;
 
   try {
+    /*
+     * 0. Prove Redis is up before anything else.
+     *
+     * Learned the hard way: with the Upstash database behind REDIS_URL deleted,
+     * this cycle sat at `await scheduler.tick()` for 36 minutes emitting
+     * nothing, because ioredis reconnects forever rather than failing. Fifteen
+     * seconds spent confirming the dependency is cheaper than an hour of
+     * silence, and it names the real problem in the log.
+     */
+    await assertRedisReachable();
+
     // 1. Consumers first, so anything the tick enqueues is picked up at once.
     startWorkers();
 
@@ -165,6 +208,8 @@ export async function runCycle(): Promise<void> {
     const summary = await report(startedAt);
     logger.info({ durationSec: Math.round((Date.now() - startedAt.getTime()) / 1000) }, `Cycle finished — ${summary}`);
 
+    cycleSucceeded = true;
+
     // Surfaced for the workflow log; GitHub renders ::notice:: in the run summary.
     console.log(`::notice title=Pipeline cycle::${summary}`);
     if (hitDeadline) {
@@ -176,8 +221,13 @@ export async function runCycle(): Promise<void> {
   } finally {
     // Order matters: stop consuming, then close producers, then the connections
     // underneath them.
+    shuttingDown = true;
     try {
       await stopWorkers();
+      // Let handlers that already returned finish their trailing writes before
+      // the pool they use disappears. See onLateError for why this is not the
+      // only guard.
+      await sleep(SETTLE_MS);
       await QueueManager.closeAll();
       await closeRedis();
       await disconnectDatabase();
